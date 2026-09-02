@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+
+      - name: Install agent deps (for hash/response unit tests)
+        run: pip install -r agent/requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check backend/app agent --ignore E501
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
