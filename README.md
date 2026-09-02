@@ -132,12 +132,22 @@ CI (`.github/workflows/ci.yml`) runs lint (`ruff`) + this suite on every push.
   `ResponseAction` table with full audit trail (pending → acknowledged →
   completed/failed), whether triggered automatically or manually from the
   dashboard.
-- **Tests + CI.** 19 pytest tests target the specific bug classes v1 hit in
-  practice (dedup flooding, hash byte-mangling), not just happy-path coverage.
+- **Tests + CI.** 20 pytest tests target the specific bug classes v1 (and
+  this rebuild) actually hit in practice — dedup flooding, hash
+  byte-mangling, and a script-run-via-interpreter detection gap found and
+  fixed during live testing on a real Mac — not just happy-path coverage.
+  CI (`.github/workflows/ci.yml`) runs lint (ruff, version-pinned with a
+  narrow rule set so results don't drift as ruff adds new default rules)
+  plus the full suite on every push, and is green on GitHub.
 - **WAL mode from day one** for the SQLite connection, since v1 hit
   read/write contention between the agent's writes and the dashboard's polls.
 
-## Phase 2 (not built yet): Apple Endpoint Security Framework
+All five detection rules, the manual response flow, and the full
+detect-alert-respond loop were verified end-to-end on a real Mac (not just
+in unit tests) — see the project's commit history / conversation log for
+the specific test procedure used for each rule.
+
+## Not built: Apple Endpoint Security Framework
 
 Right now, like v1, this uses `psutil`/`watchdog`/`log stream` — user-space
 APIs layered on `ps`/`lsof`/FSEvents/Unified Logging. The single change that
@@ -146,20 +156,20 @@ to Apple's **Endpoint Security Framework (ESF)**: a kernel-level API that
 delivers process exec/fork/exit, file, and other security events directly,
 with far fewer blind spots than polling.
 
-This needs, and is blocked on:
+This was scoped and then deliberately deprioritized, not silently dropped.
+It requires:
 
 1. **An Apple Developer Program account** ($99/year) — required to request
    the `com.apple.developer.endpoint-security.client` entitlement from Apple,
    and to code-sign the resulting binary (ESF clients must be signed).
 2. **A native helper**, since ESF has no Python bindings — either a small
    signed Swift/Objective-C binary that streams events to the Python agent
-   over a local socket, or `pyEndpointSecurity`-style bindings if we decide
-   that path is stable enough.
-3. Design decision: keep the Python agent as the "brain" (backend
-   communication, detection triggers) and have it shell out to / read from
-   a thin native ESF listener process, rather than rewriting the whole agent
-   in Swift.
+   over a local socket, or `pyEndpointSecurity`-style bindings if that path
+   turns out to be stable enough.
+3. A design decision on whether to keep the Python agent as the "brain"
+   (backend communication, detection triggers) and have it read from a thin
+   native ESF listener process, versus rewriting the agent in Swift outright.
 
-Not started — flagging it here so it's an explicit next milestone once you
-have (or decide to get) the developer account, rather than something we
-silently deferred.
+The decision was to keep the project as-is on the current user-space
+approach rather than take on the cost and native-code scope right now.
+This is the natural next milestone if that changes.
