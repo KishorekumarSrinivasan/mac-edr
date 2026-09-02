@@ -72,17 +72,31 @@ def _raise_alert(session: Session, rule: str, severity: str, message: str,
 
 
 def rule_suspicious_process_path(session: Session) -> None:
+    """Flags a process whose executable OR command line touches a
+    suspicious directory.
+
+    Checking `path` alone misses the common evasion of running a script
+    via its interpreter (`bash /tmp/payload.sh`) -- psutil reports the
+    *interpreter's* path (e.g. /bin/bash) as `exe`, not the script being
+    run, so a script dropped in /tmp or Downloads would otherwise sail
+    through undetected. `cmdline` still shows the real target path.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=60)
     procs = session.exec(
         select(ProcessSnapshot).where(ProcessSnapshot.timestamp >= cutoff)
     ).all()
     for p in procs:
+        hit_path = None
         if p.path and any(sp in p.path for sp in SUSPICIOUS_PATHS):
+            hit_path = p.path
+        elif p.cmdline and any(sp in p.cmdline for sp in SUSPICIOUS_PATHS):
+            hit_path = p.cmdline
+        if hit_path:
             _raise_alert(
                 session, "SUSPICIOUS_PROCESS_PATH", "MEDIUM",
-                f"Process '{p.name}' (pid {p.pid}) running from {p.path}",
-                dedup_key=f"SUSPICIOUS_PROCESS_PATH:{p.pid}:{p.path}",
-                source_pid=p.pid, source_path=p.path,
+                f"Process '{p.name}' (pid {p.pid}) running from {hit_path}",
+                dedup_key=f"SUSPICIOUS_PROCESS_PATH:{p.pid}:{hit_path}",
+                source_pid=p.pid, source_path=hit_path,
             )
 
 

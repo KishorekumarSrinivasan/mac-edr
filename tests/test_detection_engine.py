@@ -20,6 +20,29 @@ def test_suspicious_process_path_triggers_alert(session):
     assert alerts[0].severity == "MEDIUM"
 
 
+def test_script_run_via_interpreter_still_triggers(session):
+    """Regression test: a script run as `bash /tmp/payload.sh` reports
+    /bin/bash as its `path` (the interpreter), not the script -- this bit
+    us running a real /tmp/*.sh test file and produced no alert. The rule
+    must also check `cmdline` to catch this."""
+    from app.models import ProcessSnapshot, Alert
+    from app.detection import run_detection_cycle
+    from sqlmodel import select
+
+    session.add(ProcessSnapshot(
+        pid=1234, name="bash", user="kishore", path="/bin/bash",
+        cmdline="/bin/bash /tmp/payload.sh",
+    ))
+    session.commit()
+
+    raised = run_detection_cycle(session)
+    assert raised == 1
+    alerts = session.exec(select(Alert)).all()
+    assert len(alerts) == 1
+    assert alerts[0].rule == "SUSPICIOUS_PROCESS_PATH"
+    assert "/tmp/payload.sh" in alerts[0].message
+
+
 def test_normal_process_path_does_not_trigger(session):
     from app.models import ProcessSnapshot, Alert
     from app.detection import run_detection_cycle
