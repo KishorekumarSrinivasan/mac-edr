@@ -25,8 +25,8 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          pip install ruff
-          ruff check backend/app agent --ignore E501
+          pip install ruff==0.15.11
+          ruff check backend/app agent
 
       - name: Run tests
         run: python -m pytest tests/ -v

@@ -1,0 +1,8 @@
+# Deliberately narrow: pyflakes (F) + pycodestyle errors (E) only. Newer
+# ruff versions keep adding style/opinion rules (import sorting, Optional
+# vs X|None, blind-except, etc.) to their defaults -- pinning both the
+# version (in CI) and this explicit rule set here means lint results stay
+# stable across ruff releases instead of silently getting stricter.
+[lint]
+select = ["E", "F"]
+ignore = ["E501"]
